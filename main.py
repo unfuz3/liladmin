@@ -211,7 +211,14 @@ async def on_member_remove(member: discord.Member):
 	if not (channelid == None):
 		await member.guild.get_channel(channelid).send(f"<@{member.id}> nos ha dejado!")
 
+		
+# Event for when a reaction is added
+@client.event
+async def on_reaction_add(reaction,member):
+	con, cur = sqlConnect(f"{member.guild.id}.db")
+	cur.execute(f"SELECT ('emoji1id', 'role1id', 'emoji2id', 'role2id', 'emoji3id', 'role3id', 'emoji4id', 'role4id', 'emoji5id', 'role5id') FROM reactrole WHERE messageid={reaction.message.id}")
 
+	
 # Event for when the bot is added into a guild
 @client.event
 async def on_guild_join(guild):
@@ -223,7 +230,7 @@ async def on_guild_join(guild):
 
 		con,cur = sqlConnect(f"{guild.id}.db")
 		cur.execute("CREATE TABLE 'users' ('id' INTEGER NOT NULL UNIQUE, 'username' TEXT NOT NULL, 'discriminator' INTEGER NOT NULL, 'level' INTEGER NOT NULL DEFAULT 0, 'exp' INTEGER NOT NULL DEFAULT 0, 'lastmsgtimestamp' REAL NOT NULL, PRIMARY KEY ('id'))")
-		cur.execute("CREATE TABLE 'reactroles' ('reactrolechannelid' INTEGER, '')")
+		cur.execute("CREATE TABLE 'reactroles' ('messageid' INTEGER NOT NULL UNIQUE, 'emoji1id' INTEGER NOT NULL, 'role1id' INTEGER NOT NULL, 'emoji2id' INTEGER, 'role2id' INTEGER, 'emoji3id' INTEGER, 'role3id' INTEGER, 'emoji4id' INTEGER, 'role4id' INTEGER, 'emoji5id' INTEGER, 'role5id' INTEGER)")
 		cur.execute("CREATE TABLE 'server' ('id' INTEGER NOT NULL UNIQUE, 'welcomechannelid' INTEGER, 'farewellchannelid' INTEGER, PRIMARY KEY ('id'))")
 		cur.execute(f"INSERT INTO server (id) VALUES ({guild.id})")
 		cur.close()
