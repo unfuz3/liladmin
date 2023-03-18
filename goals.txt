@@ -1,0 +1,17 @@
+LilAdmin - Bot de administración ligera, y demás chorradas, si eso
+
+Requisitos básicos:
+	- Sistema de leveleo
+		- Algoritmo:
+			Get last msg's timestamp, get diff from current msg's timestamp, and compare the time interval
+			(<5 sec: no // 5-10 sec: 2 // 10-60 secs: 10 exp // 1-10 min: 50 exp // >10 min: 100 exp // bonus daily msg: 150 exp)
+			exp = 1000 * (lvl ** (3/2))		< - >		lvl = (exp/1000)**(2/3)
+		- Recompensas:
+			Lvl 5: Server extra
+	- Roles custom con reacciones
+	- Bienvenidas y despedidas
+
+
+Base de datos:
+
+CREATE TABLE "users" ("id" INTEGER NOT NULL UNIQUE, "username" TEXT NOT NULL, "discriminator" INTEGER NOT NULL, "level" INTEGER NOT NULL DEFAULT 0, "exp" INTEGER NOT NULL DEFAULT 0, "lastmsgtimestamp" REAL NOT NULL, PRIMARY KEY ("id"));
