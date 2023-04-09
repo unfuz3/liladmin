@@ -1,6 +1,7 @@
 # LilAdmin's source code, by unfuz3.
+# https://github.com/unfuz3/liladmin.git
 # This discord bot, meant to be used in small servers, is a lightweight, light-functionality bot. It can be used to moderate servers in some aspects.
-# Functions: Leveling system, welcoming and farewells.
+# Functions: Leveling system, welcoming and leaving.
 # Under development.
 
 
@@ -15,8 +16,6 @@ import sqlite3
 import datetime
 from discord.ext import commands
 import emoji
-
-DELTA_TIME = datetime.timedelta(hours=1)
 
 # Loads the env variables to read the bot's token
 load_dotenv()
@@ -44,7 +43,7 @@ def checkUser(msg):
 	# If user wasn't in the database, insert the default values into it
 	if (cur.fetchall() == []):
 		print(f"[INFO] Adding user {user.name}#{user.discriminator} to the server {msg.guild.name} database.")
-		cur.execute("INSERT INTO users (id,username,discriminator,level,exp,lastmsgtimestamp) VALUES (?,?,?,?,?,?)",(user.id,user.name,user.discriminator,0,0,(msg.created_at-DELTA_TIME).timestamp()))
+		cur.execute("INSERT INTO users (id,username,discriminator,level,exp,lastmsgtimestamp) VALUES (?,?,?,?,?,?)",(user.id,user.name,user.discriminator,0,0,msg.created_at.timestamp()))
 		con.commit()
 	
 	con.close()
@@ -59,8 +58,8 @@ def updateLvling(msg):
 	con, cur = sqlConnect(f"{msg.guild.id}.db")
 	cur.execute(f"SELECT level,exp,lastmsgtimestamp FROM users WHERE id='{user.id}'")
 	level, exp, lastMsgTimeStamp = cur.fetchone()
-	lastDatetime = datetime.datetime.fromtimestamp(lastMsgTimeStamp)
-	timeInterval = (currentDatetime.replace(tzinfo=None) - lastDatetime).seconds # The tzinfo makes the currentDatetime timezone-naive
+	lastDatetime = datetime.datetime.fromtimestamp(lastMsgTimeStamp, datetime.UTC)
+	timeInterval = (currentDatetime - lastDatetime).seconds # The tzinfo makes the currentDatetime timezone-naive
 
 	# Main exp sources, depends on the time interval since the last messsage from the same user
 	if (timeInterval < 5):
@@ -77,7 +76,7 @@ def updateLvling(msg):
 		else:
 			print(f"[WARN] Extreme case in exp rewarding, unusual behavior.")
 		
-		cur.execute(f"UPDATE users SET exp={newExp}, lastmsgtimestamp={(currentDatetime-DELTA_TIME).timestamp()} WHERE id={user.id}")
+		cur.execute(f"UPDATE users SET exp={newExp}, lastmsgtimestamp={(currentDatetime).timestamp()} WHERE id={user.id}")
 
 		# Level updating
 		expectedLevel = expToLvl(newExp)
@@ -99,6 +98,21 @@ def sqlConnect(dbname:str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
 	con = sqlite3.connect(dbname)
 	cur = con.cursor()
 	return con, cur
+
+
+# Checks whether server's database exists
+def dbCheck(id):
+	if not (os.path.exists(os.path.join(os.getcwd(), f"{id}.db"))):
+		print(f"[WARN] No .db found for the guild with ID: {id}.")
+
+		con,cur = sqlConnect(f"{id}.db")
+		cur.execute("CREATE TABLE 'users' ('id' INTEGER NOT NULL UNIQUE, 'username' TEXT NOT NULL, 'discriminator' INTEGER NOT NULL, 'level' INTEGER NOT NULL DEFAULT 0, 'exp' INTEGER NOT NULL DEFAULT 0, 'lastmsgtimestamp' REAL NOT NULL, PRIMARY KEY ('id'))")
+		cur.execute("CREATE TABLE 'server' ('id' INTEGER NOT NULL UNIQUE, 'welcomechannelid' INTEGER, 'leavechannelid' INTEGER, PRIMARY KEY ('id'))")
+		cur.execute(f"INSERT INTO server (id) VALUES ({id})")
+		cur.close()
+		con.commit()
+		con.close()
+
 
 
 ### COMMANDS ###
@@ -123,13 +137,15 @@ async def welcomechannel_func(ctx,channel: discord.TextChannel = commands.parame
 	if not (ctx.author.guild_permissions.administrator):
 		await ctx.send("Solo los admins pueden ejecutar este comando")
 		return
-
 	if not (channel.permissions_for(ctx.guild.get_member(client.user.id)).send_messages):
-		ctx.send("El bot no tiene permisos para mandar mensajes por ese canal")
-	if (channel.nsfw):
-		ctx.send("El canal no puede ser *nsfw*")
+		await ctx.send("El bot no tiene permisos para mandar mensajes por ese canal")
+		return
+	if (channel.is_nsfw()):
+		await ctx.send("El canal no puede ser *nsfw*")
+		return
 	if (channel.is_news()):
-		ctx.send("El canal no puede ser de noticias")
+		await ctx.send("El canal no puede ser de noticias")
+		return
 	con, cur = sqlConnect(f"{ctx.guild.id}.db")
 	cur.execute(f"UPDATE server SET welcomechannelid={channel.id} WHERE id={ctx.guild.id}")
 	cur.close()
@@ -141,28 +157,30 @@ welcomechannel_func.brief = "Establece un canal de bienvenida"
 welcomechannel_func.help = "Especifica el nuevo canal de bienvenida, el bot necesita permiso para mandar mensajes, y no puede ser nsfw o de news"
 
 
-# Change farewell channel
-@client.command(name="farewellchannel")
-async def farewell_func(ctx,channel: discord.TextChannel = commands.parameter(description="El nuevo canal de despedidas")):
+# Change leave channel
+@client.command(name="leavechannel")
+async def leave_func(ctx,channel: discord.TextChannel = commands.parameter(description="El nuevo canal de despedidas")):
 	if not (ctx.author.guild_permissions.administrator):
 		await ctx.send("Solo los admins pueden ejecutar este comando")
 		return
-
 	if not (channel.permissions_for(ctx.guild.get_member(client.user.id)).send_messages):
-		ctx.send("El bot no tiene permisos para mandar mensajes por ese canal")
-	if (channel.nsfw):
-		ctx.send("El canal no puede ser *nsfw*")
+		await ctx.send("El bot no tiene permisos para mandar mensajes por ese canal")
+		return
+	if (channel.is_nsfw()):
+		await ctx.send("El canal no puede ser *nsfw*")
+		return
 	if (channel.is_news()):
-		ctx.send("El canal no puede ser de noticias")
+		await ctx.send("El canal no puede ser de noticias")
+		return
 	con, cur = sqlConnect(f"{ctx.guild.id}.db")
-	cur.execute(f"UPDATE server SET farewellchannelid={channel.id} WHERE id={ctx.guild.id}")
+	cur.execute(f"UPDATE server SET leavechannelid={channel.id} WHERE id={ctx.guild.id}")
 	cur.close()
 	con.commit()
 	con.close()
 	await ctx.send(f"El nuevo canal de despedidas es <#{channel.id}>")
 
-farewell_func.brief = "Establece un canal de despedidas"
-farewell_func.help = "Especifica el nuevo canal de despedidas, el bot necesita permiso para mandar mensajes, y no puede ser nsfw o de news"
+leave_func.brief = "Establece un canal de despedidas"
+leave_func.help = "Especifica el nuevo canal de despedidas, el bot necesita permiso para mandar mensajes, y no puede ser nsfw o de news"
 
 
 ### EVENTS ###
@@ -176,10 +194,10 @@ async def on_ready():
 # Event for when the bot receives a message, on guild or dm
 @client.event
 async def on_message(msg):
+	dbCheck(msg.guild.id)
 	if (msg.author == client.user):
 		return
 	
-	print(emoji.demojize(msg.content))
 	checkUser(msg)
 	updateLvling(msg)
 
@@ -203,7 +221,7 @@ async def on_member_join(member: discord.Member):
 @client.event
 async def on_member_remove(member: discord.Member):
 	con, cur = sqlConnect(f"{member.guild.id}.db")
-	cur.execute(f"SELECT farewellchannelid FROM server WHERE id={member.guild.id}")
+	cur.execute(f"SELECT leavechannelid FROM server WHERE id={member.guild.id}")
 	channelid = cur.fetchone()[0]
 	cur.close()
 	con.close()
@@ -217,16 +235,7 @@ async def on_guild_join(guild):
 	print(f"[INFO] Bot's client joined guild {guild.name} - ID: {guild.id}.")
 
 	# Creates the server's database if it doesn't exist yet, with it's default tables
-	if not (os.path.exists(os.path.join(os.getcwd(), f"{guild.id}.db"))):
-		print(f"[WARN] No .db found for the guild with ID: {guild.id}.")
-
-		con,cur = sqlConnect(f"{guild.id}.db")
-		cur.execute("CREATE TABLE 'users' ('id' INTEGER NOT NULL UNIQUE, 'username' TEXT NOT NULL, 'discriminator' INTEGER NOT NULL, 'level' INTEGER NOT NULL DEFAULT 0, 'exp' INTEGER NOT NULL DEFAULT 0, 'lastmsgtimestamp' REAL NOT NULL, PRIMARY KEY ('id'))")
-		cur.execute("CREATE TABLE 'server' ('id' INTEGER NOT NULL UNIQUE, 'welcomechannelid' INTEGER, 'farewellchannelid' INTEGER, PRIMARY KEY ('id'))")
-		cur.execute(f"INSERT INTO server (id) VALUES ({guild.id})")
-		cur.close()
-		con.commit()
-		con.close()
+	dbCheck(guild.id)
 
 
 # Event for when the bot is removed from a guild
