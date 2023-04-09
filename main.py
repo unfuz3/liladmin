@@ -1,6 +1,6 @@
 # LilAdmin's source code, by unfuz3.
 # This discord bot, meant to be used in small servers, is a lightweight, light-functionality bot. It can be used to moderate servers in some aspects.
-# Functions: Leveling system, react-roles, welcoming and farewells.
+# Functions: Leveling system, welcoming and farewells.
 # Under development.
 
 
@@ -165,12 +165,6 @@ farewell_func.brief = "Establece un canal de despedidas"
 farewell_func.help = "Especifica el nuevo canal de despedidas, el bot necesita permiso para mandar mensajes, y no puede ser nsfw o de news"
 
 
-# Create a role-react message
-@client.command(name="rolereactmsg")
-async def rolereactmsg_func(ctx,msgtext: str = commands.parameter(description="El texto del mensaje de reaction")):
-	pass
-
-
 ### EVENTS ###
 
 # Event for when the bot gets online
@@ -217,24 +211,6 @@ async def on_member_remove(member: discord.Member):
 	if not (channelid == None):
 		await member.guild.get_channel(channelid).send(f"<@{member.id}> nos ha dejado!")
 
-		
-# Event for when a reaction is added
-@client.event
-async def on_reaction_add(reaction,member):
-	if reaction.me:
-		return
-	
-	con, cur = sqlConnect(f"{member.guild.id}.db")
-	cur.execute(f"SELECT ('emoji1id', 'role1id', 'emoji2id', 'role2id', 'emoji3id', 'role3id', 'emoji4id', 'role4id', 'emoji5id', 'role5id') FROM reactrole WHERE messageid={reaction.message.id}")
-	reactinfo = cur.fetchone()
-	cur.close()
-	con.close()
-	for i in [0,2,4,6,8]: #Cycle between the emojiXid indexes in reactinfo
-		print("[DEBUG]"+emoji.demojize(reaction.emoji),reactinfo[i])
-		if emoji.demojize(reaction.emoji)==reactinfo[i]:
-			await member.add_roles(discord.Object(id=reactinfo[i+1]))
-
-	
 # Event for when the bot is added into a guild
 @client.event
 async def on_guild_join(guild):
@@ -246,7 +222,6 @@ async def on_guild_join(guild):
 
 		con,cur = sqlConnect(f"{guild.id}.db")
 		cur.execute("CREATE TABLE 'users' ('id' INTEGER NOT NULL UNIQUE, 'username' TEXT NOT NULL, 'discriminator' INTEGER NOT NULL, 'level' INTEGER NOT NULL DEFAULT 0, 'exp' INTEGER NOT NULL DEFAULT 0, 'lastmsgtimestamp' REAL NOT NULL, PRIMARY KEY ('id'))")
-		cur.execute("CREATE TABLE 'reactroles' ('messageid' INTEGER NOT NULL UNIQUE, 'emoji1id' TEXT NOT NULL, 'role1id' INTEGER NOT NULL, 'emoji2id' TEXT, 'role2id' INTEGER, 'emoji3id' TEXT, 'role3id' INTEGER, 'emoji4id' TEXT, 'role4id' INTEGER, 'emoji5id' TEXT, 'role5id' INTEGER)")
 		cur.execute("CREATE TABLE 'server' ('id' INTEGER NOT NULL UNIQUE, 'welcomechannelid' INTEGER, 'farewellchannelid' INTEGER, PRIMARY KEY ('id'))")
 		cur.execute(f"INSERT INTO server (id) VALUES ({guild.id})")
 		cur.close()
