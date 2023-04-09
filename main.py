@@ -58,7 +58,7 @@ def updateLvling(msg):
 	con, cur = sqlConnect(f"{msg.guild.id}.db")
 	cur.execute(f"SELECT level,exp,lastmsgtimestamp FROM users WHERE id='{user.id}'")
 	level, exp, lastMsgTimeStamp = cur.fetchone()
-	lastDatetime = datetime.datetime.fromtimestamp(lastMsgTimeStamp, datetime.UTC)
+	lastDatetime = datetime.datetime.fromtimestamp(lastMsgTimeStamp, datetime.timezone.utc)
 	timeInterval = (currentDatetime - lastDatetime).seconds # The tzinfo makes the currentDatetime timezone-naive
 
 	# Main exp sources, depends on the time interval since the last messsage from the same user
